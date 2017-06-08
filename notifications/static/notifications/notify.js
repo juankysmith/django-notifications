@@ -7,20 +7,41 @@ var notify_mark_all_unread_url;
 var notify_refresh_period = 15000;
 var consecutive_misfires = 0;
 var registered_functions = [];
+var NOTIFICATIONS_LINK = '#notifications-link';
+var ICON_BELL = '.icon-bell2';
+
+function updateNotificationsLink(unread_count) {
+    var notificationsLink = document.querySelector(NOTIFICATIONS_LINK);
+    notificationsLink.href = notificationsLink.href.replace(/notifications=\d+/, 'notifications='+unread_count);
+}
+
+function updateBellStyle() {
+    var iconBell = document.querySelector(ICON_BELL);
+    if (iconBell != null) {
+        iconBell.className = "icon-bell2 blink-me scr-orange-color";
+    }
+}
 
 function fill_notification_badge(data) {
     var badge = document.getElementById(notify_badge_id);
     if (badge) {
         badge.innerHTML = data.unread_count;
+        updateNotificationsLink(data.unread_count);
+        if (data.unread_count > 0) {
+            updateBellStyle();
+            badge.className = "blink-me scr-orange-color";
+        }
     }
 }
 
 function fill_notification_list(data) {
     var menu = document.getElementById(notify_menu_id);
     if (menu) {
-        var content = [];
-        menu.innerHTML = data.unread_list.map(function (item) {
-            var message = "";
+        menu.innerHTML = "";
+        for (var i=0; i < data.unread_list.length; i++) {
+            var item = data.unread_list[i];
+            console.log(item)
+            var message = ""
             if(typeof item.actor !== 'undefined'){
                 message = item.actor;
             }
@@ -33,8 +54,9 @@ function fill_notification_list(data) {
             if(typeof item.timestamp !== 'undefined'){
                 message = message + " " + item.timestamp;
             }
-            return '<li>' + message + '</li>';
-        }).join('')
+
+            menu.innerHTML = menu.innerHTML + "<li>"+ message + "</li>";
+        }
     }
 }
 
@@ -47,13 +69,17 @@ function fetch_api_data() {
         //only fetch data if a function is setup
         var r = new XMLHttpRequest();
         r.open("GET", notify_api_url+'?max='+notify_fetch_count, true);
-        r.onerror = function () {
-            consecutive_misfires++;
-        }
-        r.onready = function () {
-            consecutive_misfires = 0;
-            var data = JSON.parse(r.responseText);
-            registered_functions.forEach(function (func) { func(data); });
+        r.onreadystatechange = function () {
+            if (r.readyState != 4 || r.status != 200) {
+                consecutive_misfires++;
+            }
+            else {
+                consecutive_misfires = 0;
+                for (var i=0; i < registered_functions.length; i++) {
+                    var func = registered_functions[i];
+                    func(JSON.parse(r.responseText));
+                }
+            }
         }
         r.send();
     }
@@ -68,4 +94,4 @@ function fetch_api_data() {
     }
 }
 
-setTimeout(fetch_api_data, 1000);
+setTimeout(fetch_api_data,1000);
